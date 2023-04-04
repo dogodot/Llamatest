@@ -1,21 +1,30 @@
 import os, streamlit as st
-from tradier_python import TradierAPI
 
-# Authenticate with the Tradier API
-access_token = os.environ["TRADIER_TOKEN"]
-tradier = TradierAPI(access_token, "sandbox")
+from llama_index import GPTSimpleVectorIndex, SimpleDirectoryReader, LLMPredictor, PromptHelper
+from langchain import OpenAI
 
-# Define a function to get stock quotes
-def get_stock_quote(symbol):
-    quotes = tradier.get_quotes(symbol)
-    for quote in quotes:
-        if quote.symbol == symbol:
-            return quote.last
-    return None
+openai.api_key = st.secrets["OPENAIKEY"]
 
-# Set up the Streamlit app
-st.title("Stocks App")
-symbol = st.text_input("Enter a stock symbol", "AAPL")
-if st.button("Get Quote"):
-    quote = get_stock_quote(symbol)
-    st.write(f"The last price for {symbol} is {quote}")
+# This example uses text-davinci-003 by default; feel free to change if desired
+llm_predictor = LLMPredictor(llm=OpenAI(temperature=0, model_name="text-davinci-003"))
+
+# Configure prompt parameters and initialise helper
+max_input_size = 4096
+num_output = 256
+max_chunk_overlap = 20
+
+prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
+
+# Load documents from the 'data' directory
+documents = SimpleDirectoryReader('data').load_data()
+index = GPTSimpleVectorIndex(
+    documents, llm_predictor=llm_predictor, prompt_helper=prompt_helper
+)
+
+# Define a simple Streamlit app
+st.title("Ask Llama")
+query = st.text_input("What would you like to ask?", "")
+
+if st.button("Submit"):
+    response = index.query(query)
+    st.write(response)
